@@ -103,6 +103,7 @@ def main():
     # FIX: Force MLflow to use the current working directory's absolute path.
     # This prevents Mac/Linux path conflicts in GitHub Actions.
     # ---------------------------------------------------------
+    os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
     current_dir = os.path.abspath(os.getcwd())
     tracking_uri = "file://" + os.path.join(current_dir, "mlruns")
     mlflow.set_tracking_uri(tracking_uri)
