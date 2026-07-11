@@ -46,6 +46,7 @@ def main():
     # UPDATED: Use Environment Variable first, fallback to local
     # ---------------------------------------------------------
     os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
+    print(f"DEBUG: MLFLOW_TRACKING_URI from env is: {os.environ.get('MLFLOW_TRACKING_URI')}")
     tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
     if tracking_uri:
         mlflow.set_tracking_uri(tracking_uri)

@@ -29,6 +29,19 @@ pipeline {
                 sh 'docker save heart-disease-api:latest | docker exec -i minikube docker load'
             }
         }
+       
+        stage('Train Model') {
+            environment {
+                // Explicitly define here to ensure it hits the shell process
+                MLFLOW_TRACKING_URI = 'http://20.17.177.233:5000'
+            }
+            steps {
+                echo "Starting model training..."
+                // Use 'sh' to verify it exists before running the script
+                sh 'echo "Checking ENV: $MLFLOW_TRACKING_URI"'
+                sh 'python3 src/train.py'
+            }
+        }
 
         stage('3. Deploy to Kubernetes') {
             steps {
