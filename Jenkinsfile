@@ -61,6 +61,11 @@ pipeline {
                 sh 'kubectl rollout status deployment/heart-disease-api-deployment --timeout=60s'
             }
         }
+	stage('Verify Structure') {
+            steps {
+        sh 'find . -maxdepth 2 -not -path "*/.*"'
+    }
+}
     }
 
     post {
