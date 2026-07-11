@@ -10,9 +10,9 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.metrics import ConfusionMatrixDisplay, RocCurveDisplay
 
-# ... (Keep load_data_and_features, save_visualizations, train_and_tune_model as they are) ...
-# DEFINE THE FUNCTION FIRST
+# 1. HELPER FUNCTIONS DEFINED FIRST
 def load_data_and_features():
+    """Loads the preprocessed data and the feature names from the saved preprocessor."""
     X_train = np.load('data/processed/X_train.npy')
     X_test = np.load('data/processed/X_test.npy')
     y_train = np.load('data/processed/y_train.npy')
@@ -20,10 +20,47 @@ def load_data_and_features():
     preprocessor = joblib.load('models/preprocessor.joblib')
     return X_train, X_test, y_train, y_test, preprocessor.get_feature_names_out()
 
-# ... (other functions) ...
+def save_visualizations(model, X_test, y_test, model_name, feature_names):
+    """Generates and saves the Confusion Matrix, ROC Curve, and Feature Importance plots."""
+    os.makedirs('plots', exist_ok=True)
+    safe_name = model_name.replace(' ', '_').lower()
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ConfusionMatrixDisplay.from_estimator(model, X_test, y_test, cmap='Blues', ax=ax)
+    plt.title(f'{model_name} - Confusion Matrix')
+    plt.savefig(f"plots/{safe_name}_confusion_matrix.png", bbox_inches='tight')
+    plt.close()
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    RocCurveDisplay.from_estimator(model, X_test, y_test, ax=ax)
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.title(f'{model_name} - ROC Curve')
+    plt.savefig(f"plots/{safe_name}_roc_curve.png", bbox_inches='tight')
+    plt.close()
+    
+    plt.figure(figsize=(10, 8))
+    if hasattr(model, 'coef_'):
+        importance = model.coef_[0]
+    elif hasattr(model, 'feature_importances_'):
+        importance = model.feature_importances_
+    else:
+        return
+        
+    indices = np.argsort(np.abs(importance))
+    plt.barh(range(len(indices)), importance[indices], color='skyblue')
+    plt.yticks(range(len(indices)), [feature_names[i] for i in indices])
+    plt.title(f'{model_name} - Feature Importance')
+    plt.tight_layout()
+    plt.savefig(f"plots/{safe_name}_feature_importance.png", bbox_inches='tight')
+    plt.close()
+
+def train_and_tune_model(model, param_grid, X_train, y_train, model_name):
+    print(f"\nRunning GridSearchCV for {model_name}...")
+    grid_search = GridSearchCV(estimator=model, param_grid=param_grid, cv=5, scoring='roc_auc', n_jobs=-1)
+    grid_search.fit(X_train, y_train)
+    return grid_search.best_estimator_
 
 def evaluate_model(model, X_train, y_train, X_test, y_test, model_name, feature_names):
-    """Evaluates the model, generates visualizations, and logs everything to MLflow."""
     print(f"\n--- Evaluating {model_name} ---")
     
     with mlflow.start_run(run_name=model_name):
@@ -42,36 +79,30 @@ def evaluate_model(model, X_train, y_train, X_test, y_test, model_name, feature_
         save_visualizations(model, X_test, y_test, model_name, feature_names)
         mlflow.log_artifacts("plots", artifact_path="evaluation_plots")
         
-        # UPDATED: Log model with registration name for the Model Registry
+        # Log model and register it
         mlflow.sklearn.log_model(
-            model, 
+            sk_model=model, 
             artifact_path="model",
             registered_model_name="HeartDiseaseModel"
         )
         
         return accuracy_score(y_test, y_pred), roc_auc_score(y_test, y_proba)
 
+# 2. MAIN EXECUTION
 def main():
-    # ---------------------------------------------------------
-    # UPDATED: Use Environment Variable first, fallback to local
-    # ---------------------------------------------------------
+    # Force MLflow configurations
     os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
-    print(f"DEBUG: MLFLOW_TRACKING_URI from env is: {os.environ.get('MLFLOW_TRACKING_URI')}")
-    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
-    if tracking_uri:
-        mlflow.set_tracking_uri(tracking_uri)
-    else:
-        # Fallback to local storage if running outside Jenkins/Azure environment
-        current_dir = os.path.abspath(os.getcwd())
-        mlflow.set_tracking_uri("file://" + os.path.join(current_dir, "mlruns"))
     
+    # Priority: Env Var > Default Remote > Local fallback
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "http://20.17.177.233:5000")
+    mlflow.set_tracking_uri(tracking_uri)
     print(f"MLflow tracking URI set to: {mlflow.get_tracking_uri()}")
     
     mlflow.set_experiment("Heart_Disease_Prediction_MLOps")
     
+    # Now load_data_and_features is defined and accessible
     X_train, X_test, y_train, y_test, feature_names = load_data_and_features()
     
-    # ... (Keep param grids and model initialization as they are) ...
     log_reg_params = {'C': [0.01, 0.1, 1, 10], 'solver': ['liblinear', 'lbfgs']}
     rf_params = {'n_estimators': [50, 100, 200], 'max_depth': [None, 10, 20]}
     
@@ -81,13 +112,10 @@ def main():
     best_log_reg = train_and_tune_model(log_reg_base, log_reg_params, X_train, y_train, "Logistic Regression")
     best_rf = train_and_tune_model(rf_base, rf_params, X_train, y_train, "Random Forest")
     
-    lr_acc, lr_auc = evaluate_model(best_log_reg, X_train, y_train, X_test, y_test, "Logistic Regression", feature_names)
-    rf_acc, rf_auc = evaluate_model(best_rf, X_train, y_train, X_test, y_test, "Random Forest", feature_names)
+    evaluate_model(best_log_reg, X_train, y_train, X_test, y_test, "Logistic Regression", feature_names)
+    evaluate_model(best_rf, X_train, y_train, X_test, y_test, "Random Forest", feature_names)
     
-    final_model = best_log_reg if lr_auc > rf_auc else best_rf
-    os.makedirs('models', exist_ok=True)
-    joblib.dump(final_model, 'models/best_model.joblib')
-    print("\nTraining complete. Model saved locally and registered in MLflow.")
+    print("\nTraining complete. Model registered in MLflow.")
 
 if __name__ == "__main__":
     main()
