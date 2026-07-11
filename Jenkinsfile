@@ -9,9 +9,11 @@ pipeline {
         stage('1. Checkout Code') {
             steps {
                 checkout scm
-                // Force the Jenkins user to take ownership of the workspace
-                sh 'chown -R jenkins:jenkins .'
-                sh 'chmod -R 755 .'
+                // Ensure workspace folders exist and are writable
+                sh '''
+                    mkdir -p plots mlruns
+                    chmod -R 777 plots mlruns
+                '''
             }
         }
 
@@ -24,20 +26,22 @@ pipeline {
 
         stage('3. Train Model') {
             steps {
-                script {
-                    echo "Current Workspace: ${env.WORKSPACE}"
-                    sh 'ls -ld .'
-                   }
-                // Using withEnv ensures these variables are injected into the shell session
-                withEnv(['MLFLOW_TRACKING_URI=http://20.17.177.233:5000', 'MLFLOW_ALLOW_FILE_STORE=true', 'MLFLOW_HTTP_PROXY_ARTIFACTS=true']) {
+                // Set env variables to force proxy mode and use the workspace for local staging
+                withEnv([
+                    'MLFLOW_TRACKING_URI=http://20.17.177.233:5000',
+                    'MLFLOW_HTTP_PROXY_ARTIFACTS=true',
+                    'MLFLOW_ALLOW_FILE_STORE=false', // FORCE PROXY: Error if network fails
+                    'MLFLOW_ARTIFACT_ROOT=' + env.WORKSPACE + '/mlruns'
+                ]) {
                     echo "Starting model training..."
-                    // Corrected to exactly three single quotes
                     sh '''
-                        # Create venv if it doesn't exist
+                        # Ensure venv is ready
                         if [ ! -d "venv" ]; then
                             python3 -m venv venv
+                            ./venv/bin/pip install --upgrade pip
                             ./venv/bin/pip install mlflow scikit-learn pandas joblib matplotlib
                         fi
+                        
                         # Run the updated training script
                         ./venv/bin/python src/train.py
                     '''

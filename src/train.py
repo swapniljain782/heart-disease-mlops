@@ -11,6 +11,8 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.metrics import ConfusionMatrixDisplay, RocCurveDisplay
 
+WORKSPACE = os.getcwd()
+
 # 1. HELPER FUNCTIONS
 def load_data_and_features():
     X_train = np.load('data/processed/X_train.npy')
@@ -22,7 +24,7 @@ def load_data_and_features():
 
 def save_visualizations(model, X_test, y_test, model_name, feature_names):
     # Use relative path (current working directory) to stay in the Jenkins workspace
-    plot_dir = "plots"
+    plot_dir = os.path.join(WORKSPACE, "plots")
     os.makedirs(plot_dir, exist_ok=True)
     safe_name = model_name.replace(' ', '_').lower()
 
@@ -97,30 +99,40 @@ def evaluate_model(model, X_train, y_train, X_test, y_test, model_name, feature_
             print(f"❌ Failed to register model: {e}")
         
         return accuracy_score(y_test, y_pred), roc_auc_score(y_test, y_proba)
+  
     
 # 2. MAIN EXECUTION
 def main():
-    # Force Artifact Proxying
+    # 1. Configuration for Remote Artifact Proxying
+    # We DO NOT set MLFLOW_ARTIFACT_URI to a local path. 
+    # We let MLflow use the Tracking URI to find the server's artifact endpoint.
+    os.environ["MLFLOW_TRACKING_URI"] = "http://20.17.177.233:5000"
     os.environ["MLFLOW_HTTP_PROXY_ARTIFACTS"] = "true"
     os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
     
-    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "http://20.17.177.233:5000")
+    # 2. Set Tracking URI
+    tracking_uri = os.environ["MLFLOW_TRACKING_URI"]
     mlflow.set_tracking_uri(tracking_uri)
-    # Force artifact URI to use tracking server as proxy
-    os.environ["MLFLOW_ARTIFACT_URI"] = tracking_uri + "/artifacts"
+    
+    # 3. Create ONLY the local directory for plots (your temporary scratchpad)
+    # Do NOT set this as the Artifact URI, or it will try to write MLflow internals there
+    local_plots = os.path.join(os.getcwd(), "plots")
+    os.makedirs(local_plots, exist_ok=True)
     
     mlflow.set_experiment("Heart_Disease_Prediction_MLOps")
     
+    # 4. Load Data
     X_train, X_test, y_train, y_test, feature_names = load_data_and_features()
     
+    # 5. Model Training
     log_reg_params = {'C': [0.1, 1], 'solver': ['liblinear']}
     rf_params = {'n_estimators': [50], 'max_depth': [10]}
     
     best_log_reg = train_and_tune_model(LogisticRegression(), log_reg_params, X_train, y_train, "Logistic Regression")
     best_rf = train_and_tune_model(RandomForestClassifier(), rf_params, X_train, y_train, "Random Forest")
     
+    # 6. Evaluation
     evaluate_model(best_log_reg, X_train, y_train, X_test, y_test, "Logistic Regression", feature_names)
     evaluate_model(best_rf, X_train, y_train, X_test, y_test, "Random Forest", feature_names)
 
-if __name__ == "__main__":
-    main()
+    print("\n✅ Training and registration complete.")
