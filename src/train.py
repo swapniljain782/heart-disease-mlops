@@ -11,6 +11,16 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from sklearn.metrics import ConfusionMatrixDisplay, RocCurveDisplay
 
 # ... (Keep load_data_and_features, save_visualizations, train_and_tune_model as they are) ...
+# DEFINE THE FUNCTION FIRST
+def load_data_and_features():
+    X_train = np.load('data/processed/X_train.npy')
+    X_test = np.load('data/processed/X_test.npy')
+    y_train = np.load('data/processed/y_train.npy')
+    y_test = np.load('data/processed/y_test.npy')
+    preprocessor = joblib.load('models/preprocessor.joblib')
+    return X_train, X_test, y_train, y_test, preprocessor.get_feature_names_out()
+
+# ... (other functions) ...
 
 def evaluate_model(model, X_train, y_train, X_test, y_test, model_name, feature_names):
     """Evaluates the model, generates visualizations, and logs everything to MLflow."""
