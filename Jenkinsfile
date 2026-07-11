@@ -4,10 +4,11 @@ pipeline {
         label 'built-in' 
     }
 
-    // ADD THIS BLOCK: Tell kubectl exactly where to find the Minikube credentials
     environment {
-    // Point Jenkins to its own dedicated configuration file
-    KUBECONFIG = '/var/lib/jenkins/.kube/config'
+        // Point Jenkins to its own dedicated configuration file
+        KUBECONFIG = '/var/lib/jenkins/.kube/config'
+        // ADDED: Tell the environment where to find the MLflow server
+        MLFLOW_TRACKING_URI = 'http://20.17.177.233:5000'
     }
 
     stages {
@@ -23,7 +24,7 @@ pipeline {
                 echo "Building the Docker image..."
                 sh 'docker build -t heart-disease-api:latest .'
 
-               echo "Injecting image into Minikube's internal registry..."
+                echo "Injecting image into Minikube's internal registry..."
                 // This saves the image and pipes it directly into the Minikube container
                 sh 'docker save heart-disease-api:latest | docker exec -i minikube docker load'
             }
