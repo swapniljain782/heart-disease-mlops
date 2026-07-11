@@ -1,5 +1,8 @@
 pipeline {
-    agent any
+    // Force the pipeline to execute ONLY on the main Jenkins host machine
+    agent { 
+        label 'built-in' 
+    }
 
     // ADD THIS BLOCK: Tell kubectl exactly where to find the Minikube credentials
     environment {
