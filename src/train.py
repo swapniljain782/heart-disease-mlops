@@ -1,4 +1,5 @@
 import os
+import glob
 import numpy as np
 import joblib
 import matplotlib.pyplot as plt
@@ -10,9 +11,8 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.metrics import ConfusionMatrixDisplay, RocCurveDisplay
 
-# 1. HELPER FUNCTIONS DEFINED FIRST
+# 1. HELPER FUNCTIONS
 def load_data_and_features():
-    """Loads the preprocessed data and the feature names from the saved preprocessor."""
     X_train = np.load('data/processed/X_train.npy')
     X_test = np.load('data/processed/X_test.npy')
     y_train = np.load('data/processed/y_train.npy')
@@ -21,23 +21,27 @@ def load_data_and_features():
     return X_train, X_test, y_train, y_test, preprocessor.get_feature_names_out()
 
 def save_visualizations(model, X_test, y_test, model_name, feature_names):
-    """Generates and saves the Confusion Matrix, ROC Curve, and Feature Importance plots."""
-    os.makedirs('plots', exist_ok=True)
+    # Use relative path (current working directory) to stay in the Jenkins workspace
+    plot_dir = "plots"
+    os.makedirs(plot_dir, exist_ok=True)
     safe_name = model_name.replace(' ', '_').lower()
 
+    # Save Confusion Matrix
     fig, ax = plt.subplots(figsize=(6, 6))
     ConfusionMatrixDisplay.from_estimator(model, X_test, y_test, cmap='Blues', ax=ax)
     plt.title(f'{model_name} - Confusion Matrix')
-    plt.savefig(f"plots/{safe_name}_confusion_matrix.png", bbox_inches='tight')
+    plt.savefig(f"{plot_dir}/{safe_name}_confusion_matrix.png", bbox_inches='tight')
     plt.close()
 
+    # Save ROC Curve
     fig, ax = plt.subplots(figsize=(6, 6))
     RocCurveDisplay.from_estimator(model, X_test, y_test, ax=ax)
     plt.plot([0, 1], [0, 1], 'k--')
     plt.title(f'{model_name} - ROC Curve')
-    plt.savefig(f"plots/{safe_name}_roc_curve.png", bbox_inches='tight')
+    plt.savefig(f"{plot_dir}/{safe_name}_roc_curve.png", bbox_inches='tight')
     plt.close()
     
+    # Save Feature Importance
     plt.figure(figsize=(10, 8))
     if hasattr(model, 'coef_'):
         importance = model.coef_[0]
@@ -51,7 +55,7 @@ def save_visualizations(model, X_test, y_test, model_name, feature_names):
     plt.yticks(range(len(indices)), [feature_names[i] for i in indices])
     plt.title(f'{model_name} - Feature Importance')
     plt.tight_layout()
-    plt.savefig(f"plots/{safe_name}_feature_importance.png", bbox_inches='tight')
+    plt.savefig(f"{plot_dir}/{safe_name}_feature_importance.png", bbox_inches='tight')
     plt.close()
 
 def train_and_tune_model(model, param_grid, X_train, y_train, model_name):
@@ -63,8 +67,7 @@ def train_and_tune_model(model, param_grid, X_train, y_train, model_name):
 def evaluate_model(model, X_train, y_train, X_test, y_test, model_name, feature_names):
     print(f"\n--- Evaluating {model_name} ---")
     
-    # We use 'run' to get the run_id explicitly
-    with mlflow.start_run(run_name=model_name) as run:
+    with mlflow.start_run(run_name=model_name):
         mlflow.log_params(model.get_params())
         y_pred = model.predict(X_test)
         y_proba = model.predict_proba(X_test)[:, 1]
@@ -78,22 +81,18 @@ def evaluate_model(model, X_train, y_train, X_test, y_test, model_name, feature_
         })
         
         save_visualizations(model, X_test, y_test, model_name, feature_names)
-        mlflow.log_artifacts("plots", artifact_path="evaluation_plots")
         
-        # 1. Log the model artifact only (no registration here)
-        model_info = mlflow.sklearn.log_model(
-            sk_model=model, 
-            artifact_path="model"
-        )
+        # LOG ARTIFACTS SINGULARLY: Avoids recursive mkdir permission issues
+        for plot in glob.glob("plots/*.png"):
+            mlflow.log_artifact(plot, artifact_path="evaluation_plots")
         
-        # 2. Explicitly register the model using the captured model_info.model_uri
-        # This is the standard, reliable pattern in MLflow 3.x
+        # LOG MODEL ONLY: Do not use registered_model_name here
+        model_info = mlflow.sklearn.log_model(sk_model=model, artifact_path="model")
+        
+        # EXPLICIT REGISTRATION: Highly reliable for MLflow 3.x
         try:
-            result = mlflow.register_model(
-                model_uri=model_info.model_uri,
-                name="HeartDiseaseModel"
-            )
-            print(f"✅ Model registered successfully: {result.name} version {result.version}")
+            result = mlflow.register_model(model_uri=model_info.model_uri, name="HeartDiseaseModel")
+            print(f"✅ Model registered: {result.name} version {result.version}")
         except Exception as e:
             print(f"❌ Failed to register model: {e}")
         
@@ -101,33 +100,27 @@ def evaluate_model(model, X_train, y_train, X_test, y_test, model_name, feature_
     
 # 2. MAIN EXECUTION
 def main():
-    # Force MLflow configurations
+    # Force Artifact Proxying
     os.environ["MLFLOW_HTTP_PROXY_ARTIFACTS"] = "true"
     os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
     
-    # Priority: Env Var > Default Remote > Local fallback
     tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "http://20.17.177.233:5000")
     mlflow.set_tracking_uri(tracking_uri)
-    print(f"MLflow tracking URI set to: {mlflow.get_tracking_uri()}")
+    # Force artifact URI to use tracking server as proxy
+    os.environ["MLFLOW_ARTIFACT_URI"] = tracking_uri + "/artifacts"
     
     mlflow.set_experiment("Heart_Disease_Prediction_MLOps")
     
-    # Now load_data_and_features is defined and accessible
     X_train, X_test, y_train, y_test, feature_names = load_data_and_features()
     
-    log_reg_params = {'C': [0.01, 0.1, 1, 10], 'solver': ['liblinear', 'lbfgs']}
-    rf_params = {'n_estimators': [50, 100, 200], 'max_depth': [None, 10, 20]}
+    log_reg_params = {'C': [0.1, 1], 'solver': ['liblinear']}
+    rf_params = {'n_estimators': [50], 'max_depth': [10]}
     
-    log_reg_base = LogisticRegression(random_state=42, max_iter=1000)
-    rf_base = RandomForestClassifier(random_state=42)
-    
-    best_log_reg = train_and_tune_model(log_reg_base, log_reg_params, X_train, y_train, "Logistic Regression")
-    best_rf = train_and_tune_model(rf_base, rf_params, X_train, y_train, "Random Forest")
+    best_log_reg = train_and_tune_model(LogisticRegression(), log_reg_params, X_train, y_train, "Logistic Regression")
+    best_rf = train_and_tune_model(RandomForestClassifier(), rf_params, X_train, y_train, "Random Forest")
     
     evaluate_model(best_log_reg, X_train, y_train, X_test, y_test, "Logistic Regression", feature_names)
     evaluate_model(best_rf, X_train, y_train, X_test, y_test, "Random Forest", feature_names)
-    
-    print("\nTraining complete. Model registered in MLflow.")
 
 if __name__ == "__main__":
     main()
