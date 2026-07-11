@@ -22,6 +22,10 @@ pipeline {
             steps {
                 echo "Building the Docker image..."
                 sh 'docker build -t heart-disease-api:latest .'
+
+               echo "Injecting image into Minikube's internal registry..."
+                // This saves the image and pipes it directly into the Minikube container
+                sh 'docker save heart-disease-api:latest | docker exec -i minikube docker load'
             }
         }
 
