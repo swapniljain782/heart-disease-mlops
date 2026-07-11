@@ -24,7 +24,12 @@ pipeline {
                 // Using withEnv ensures these variables are injected into the shell session
                 withEnv(['MLFLOW_TRACKING_URI=http://20.17.177.233:5000', 'MLFLOW_ALLOW_FILE_STORE=true']) {
                     echo "Starting model training..."
-                    sh 'python3 src/train.py'
+                    sh ''''
+                    python3 -m venv venv
+                    ./venv/bin/pip install mlflow scikit-learn pandas joblib matplotlib
+           
+                    # Use that venv to run your script
+                    ./venv/bin/python src/train.py
                 }
             }
         }
