@@ -63,7 +63,8 @@ def train_and_tune_model(model, param_grid, X_train, y_train, model_name):
 def evaluate_model(model, X_train, y_train, X_test, y_test, model_name, feature_names):
     print(f"\n--- Evaluating {model_name} ---")
     
-    with mlflow.start_run(run_name=model_name):
+    # We use 'run' to get the run_id explicitly
+    with mlflow.start_run(run_name=model_name) as run:
         mlflow.log_params(model.get_params())
         y_pred = model.predict(X_test)
         y_proba = model.predict_proba(X_test)[:, 1]
@@ -79,15 +80,25 @@ def evaluate_model(model, X_train, y_train, X_test, y_test, model_name, feature_
         save_visualizations(model, X_test, y_test, model_name, feature_names)
         mlflow.log_artifacts("plots", artifact_path="evaluation_plots")
         
-        # Log model and register it
-        mlflow.sklearn.log_model(
+        # 1. Log the model artifact only (no registration here)
+        model_info = mlflow.sklearn.log_model(
             sk_model=model, 
-            artifact_path="model",
-            registered_model_name="HeartDiseaseModel"
+            artifact_path="model"
         )
         
+        # 2. Explicitly register the model using the captured model_info.model_uri
+        # This is the standard, reliable pattern in MLflow 3.x
+        try:
+            result = mlflow.register_model(
+                model_uri=model_info.model_uri,
+                name="HeartDiseaseModel"
+            )
+            print(f"✅ Model registered successfully: {result.name} version {result.version}")
+        except Exception as e:
+            print(f"❌ Failed to register model: {e}")
+        
         return accuracy_score(y_test, y_pred), roc_auc_score(y_test, y_proba)
-
+    
 # 2. MAIN EXECUTION
 def main():
     # Force MLflow configurations
