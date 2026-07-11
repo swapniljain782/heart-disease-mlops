@@ -1,0 +1,23 @@
+# Virtual Environments
+venv/
+.venv/
+env/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# Environment Variables / Secrets
+.env
+
+# macOS System Files
+.DS_Store
+
+# Data & Models (Optional but recommended so you don't push massive files)
+# data/raw/
+# data/processed/
+# models/*.pkl
