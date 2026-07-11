@@ -3,7 +3,7 @@ pipeline {
 
     // ADD THIS BLOCK: Tell kubectl exactly where to find the Minikube credentials
     environment {
-        KUBECONFIG = '/var/lib/jenkins/.kube/config'
+        KUBECONFIG = '/home/swapnil/.kube/config'
     }
 
     stages {
