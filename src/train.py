@@ -102,6 +102,7 @@ def evaluate_model(model, X_train, y_train, X_test, y_test, model_name, feature_
 # 2. MAIN EXECUTION
 def main():
     # Force MLflow configurations
+    os.environ["MLFLOW_HTTP_PROXY_ARTIFACTS"] = "true"
     os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
     
     # Priority: Env Var > Default Remote > Local fallback
