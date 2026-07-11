@@ -2,13 +2,13 @@ apiVersion: v1
 kind: Service
 metadata:
   name: grafana-service
-  labels:
-    app: grafana
 spec:
-  type: LoadBalancer # Exposes the service externally
+  type: LoadBalancer
+  externalIPs:
+    - 20.17.177.133  # <-- Replace with your Azure VM Private IP
   selector:
-    app: grafana     # Must match the labels in your Grafana Deployment
+    app: grafana
   ports:
     - protocol: TCP
-      port: 3000     # The port you will hit in your browser
-      targetPort: 3000 # The port the Grafana container is listening on
+      port: 3000
+      targetPort: 3000

@@ -46,3 +46,9 @@ jobs:
       with:
         name: evaluation-plots
         path: plots/
+
+    - name: Trigger Jenkins CD Pipeline
+      if: success() && github.ref == 'refs/heads/main'
+      run: |
+        curl -X POST "http://${{ secrets.JENKINS_IP }}:8080/job/MLOps-Deployment/buildWithParameters?token=${{ secrets.JENKINS_TOKEN }}" \
+        --user "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_API_TOKEN }}"
