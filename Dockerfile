@@ -10,10 +10,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the API code and the trained models into the container
 COPY api/ ./api/
+COPY src/ ./src/
 COPY models/ ./models/
 
 # Expose the port the app runs on
 EXPOSE 8000
 
 # Command to run the FastAPI server using Uvicorn
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000"]
