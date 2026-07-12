@@ -24,44 +24,20 @@ pipeline {
             }
         }
 
-        stage('3. Train Model') {
-            steps {
-                // Set env variables to force proxy mode. 
-                // We removed the MLFLOW_ARTIFACT_ROOT override so it uploads to the server!
-                withEnv([
-                    'MLFLOW_TRACKING_URI=http://20.17.177.233:5000',
-                    'MLFLOW_HTTP_PROXY_ARTIFACTS=true'
-                ]) {
-                    echo "Starting model training..."
-                    sh '''
-                        # Ensure venv is ready
-                        if [ ! -d "venv" ]; then
-                            python3 -m venv venv
-                            ./venv/bin/pip install --upgrade pip
-                            ./venv/bin/pip install mlflow scikit-learn pandas joblib matplotlib
-                        fi
-                        
-                        # Run the updated training script
-                        ./venv/bin/python src/train.py
-                    '''
-                }
-            }
-        }
-
-        stage('4. Deploy to Kubernetes') {
+        stage('3. Deploy to Kubernetes') {
             steps {
                 sh 'kubectl apply -f k8s/'
                 sh 'kubectl rollout restart deployment heart-disease-api-deployment'
             }
         }
 
-        stage('5. Verify Deployment') {
+        stage('4. Verify Deployment') {
             steps {
                 sh 'kubectl rollout status deployment/heart-disease-api-deployment --timeout=60s'
             }
         }
-        
-        stage('6. Verify Structure') {
+
+        stage('5. Verify Structure') {
             steps {
                 sh 'find . -maxdepth 2 -not -path "*/.*"'
             }
