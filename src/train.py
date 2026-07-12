@@ -88,8 +88,8 @@ def evaluate_model(model, X_train, y_train, X_test, y_test, model_name, feature_
         for plot in glob.glob("plots/*.png"):
             mlflow.log_artifact(plot, artifact_path="evaluation_plots")
         
-        # LOG MODEL ONLY: Do not use registered_model_name here
-        model_info = mlflow.sklearn.log_model(sk_model=model, artifact_path="model", registered_model_name="HeartDiseaseModel")
+        # LOG MODEL ONLY: Removed registered_model_name to prevent double-registration
+        model_info = mlflow.sklearn.log_model(sk_model=model, artifact_path="model")
         
         # EXPLICIT REGISTRATION: Highly reliable for MLflow 3.x
         try:
@@ -119,7 +119,7 @@ def main():
     local_plots = os.path.join(os.getcwd(), "plots")
     os.makedirs(local_plots, exist_ok=True)
     
-#    mlflow.set_experiment("Heart_Disease_Prediction_MLOps")
+    # Using V2 to ensure the remote artifact path is cleanly mapped
     mlflow.set_experiment("Heart_Disease_Prediction_V2")
     
     # 4. Load Data
@@ -137,3 +137,6 @@ def main():
     evaluate_model(best_rf, X_train, y_train, X_test, y_test, "Random Forest", feature_names)
 
     print("\n✅ Training and registration complete.")
+
+if __name__ == "__main__":
+    main()
