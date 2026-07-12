@@ -26,12 +26,11 @@ pipeline {
 
         stage('3. Train Model') {
             steps {
-                // Set env variables to force proxy mode and use the workspace for local staging
+                // Set env variables to force proxy mode. 
+                // We removed the MLFLOW_ARTIFACT_ROOT override so it uploads to the server!
                 withEnv([
                     'MLFLOW_TRACKING_URI=http://20.17.177.233:5000',
-                    'MLFLOW_HTTP_PROXY_ARTIFACTS=true',
-                    'MLFLOW_ALLOW_FILE_STORE=false', // FORCE PROXY: Error if network fails
-                    'MLFLOW_ARTIFACT_ROOT=' + env.WORKSPACE + '/mlruns'
+                    'MLFLOW_HTTP_PROXY_ARTIFACTS=true'
                 ]) {
                     echo "Starting model training..."
                     sh '''
@@ -61,11 +60,12 @@ pipeline {
                 sh 'kubectl rollout status deployment/heart-disease-api-deployment --timeout=60s'
             }
         }
-	stage('Verify Structure') {
+        
+        stage('6. Verify Structure') {
             steps {
-        sh 'find . -maxdepth 2 -not -path "*/.*"'
-    }
-}
+                sh 'find . -maxdepth 2 -not -path "*/.*"'
+            }
+        }
     }
 
     post {
