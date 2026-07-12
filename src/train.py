@@ -119,7 +119,8 @@ def main():
     local_plots = os.path.join(os.getcwd(), "plots")
     os.makedirs(local_plots, exist_ok=True)
     
-    mlflow.set_experiment("Heart_Disease_Prediction_MLOps")
+#    mlflow.set_experiment("Heart_Disease_Prediction_MLOps")
+    mlflow.set_experiment("Heart_Disease_Prediction_V2")
     
     # 4. Load Data
     X_train, X_test, y_train, y_test, feature_names = load_data_and_features()
