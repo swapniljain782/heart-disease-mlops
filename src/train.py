@@ -89,7 +89,7 @@ def evaluate_model(model, X_train, y_train, X_test, y_test, model_name, feature_
             mlflow.log_artifact(plot, artifact_path="evaluation_plots")
         
         # LOG MODEL ONLY: Do not use registered_model_name here
-        model_info = mlflow.sklearn.log_model(sk_model=model, artifact_path="model")
+        model_info = mlflow.sklearn.log_model(sk_model=model, artifact_path="model", registered_model_name="HeartDiseaseModel")
         
         # EXPLICIT REGISTRATION: Highly reliable for MLflow 3.x
         try:
